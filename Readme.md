@@ -1,4 +1,4 @@
-# My first backend project with Chai aur Backend series by Hitesh Chaudhary
+# My First Backend Project
 
 This is a video series on backend with Javascript
 
