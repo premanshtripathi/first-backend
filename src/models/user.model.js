@@ -1,5 +1,6 @@
 import mongoose, { Schema } from "mongoose";
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 
 const userSchema = new Schema(
   {
@@ -49,7 +50,8 @@ const userSchema = new Schema(
 
 //using function instead of arrowFn because we need this context of userModel.
 userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
+  if (!this.isModified("password")) return;
+  // if (!this.isModified("password")) return next();
 
   this.password = await bcrypt.hash(this.password, 10);
 
