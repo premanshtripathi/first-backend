@@ -4,17 +4,18 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 
 const generateAccessAndRefreshTokens = async (userId) => {
   try {
     const user = await User.findById(userId);
-    const accessToken = user.generateAccessToken();
-    const refreshToken = user.generateRefreshToken();
+    const newAccessToken = user.generateAccessToken();
+    const newRefreshToken = user.generateRefreshToken();
 
-    user.refreshToken = refreshToken;
-    user.save({ validateBeforeSave: false });
+    user.refreshToken = newRefreshToken;
+    await user.save({ validateBeforeSave: false });
 
-    return { accessToken, refreshToken };
+    return { newAccessToken, newRefreshToken };
   } catch (error) {
     console.log("Error: ", error);
     throw new ApiError(
@@ -132,9 +133,8 @@ const loginUser = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Invalid user credentials!");
   }
 
-  const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
-    user._id
-  );
+  const { newAccessToken, newRefreshToken } =
+    await generateAccessAndRefreshTokens(user._id);
 
   const loggedInUser = await User.findById(user._id).select(
     "-password -refreshToken"
@@ -147,15 +147,15 @@ const loginUser = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .cookie("accessToken", accessToken, options)
-    .cookie("refreshToken", refreshToken, options)
+    .cookie("accessToken", newAccessToken, options)
+    .cookie("refreshToken", newRefreshToken, options)
     .json(
       new ApiResponse(
         200,
         {
           user: loggedInUser,
-          accessToken,
-          refreshToken,
+          accessToken: newAccessToken,
+          refreshToken: newRefreshToken,
         },
         "User logged in successfully."
       )
@@ -274,7 +274,7 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
   }
 
   const user = await User.findByIdAndUpdate(
-    req.body?._id,
+    req.user?._id,
     {
       $set: {
         fullname,
@@ -303,7 +303,7 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
   }
 
   const user = await User.findByIdAndUpdate(
-    req.body?._id,
+    req.user?._id,
     { $set: { avatar: avatar.url } },
     { new: true }
   ).select("-password");
@@ -327,7 +327,7 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
   }
 
   const user = await User.findByIdAndUpdate(
-    req.body?._id,
+    req.user?._id,
     { $set: { coverImage: coverImage.url } },
     { new: true }
   ).select("-password");
@@ -378,7 +378,7 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
         },
         isSubscribed: {
           $cond: {
-            if: { $in: [req.user?._id, "subscribers.subscriber"] },
+            if: { $in: [req.user?._id, "$subscribers.subscriber"] },
             then: true,
             else: false,
           },
@@ -388,14 +388,14 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
 
     {
       $project: {
-        fullname: 1,
         username: 1,
+        email: 1,
+        fullname: 1,
+        avatar: 1,
+        coverImage: 1,
         subscribersCount: 1,
         subscribedToCount: 1,
         isSubscribed: 1,
-        avatar: 1,
-        coverImage: 1,
-        email: 1,
       },
     },
   ]);
