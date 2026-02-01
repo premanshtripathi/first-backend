@@ -13,8 +13,7 @@ connectDB()
       throw error;
     });
     app.listen(PORT, () => {
-      console.log(`✅ Server is running at port: ${PORT}`);
-      console.log(`✅ Process PID: ${process.pid}`);
+      console.log(`\n⚙️  Server is listening at port: ${PORT}`);
     });
   })
   .catch((error) => {
