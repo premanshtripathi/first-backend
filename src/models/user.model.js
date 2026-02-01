@@ -8,7 +8,7 @@ const userSchema = new Schema(
       type: String,
       required: [true, "Username is required!"],
       unique: true,
-      lowecase: true,
+      lowercase: true,
       trim: true,
       index: true,
     },
@@ -16,7 +16,7 @@ const userSchema = new Schema(
       type: String,
       required: [true, "Email is required!"],
       unique: true,
-      lowecase: true,
+      lowercase: true,
       trim: true,
     },
     fullname: {
@@ -70,7 +70,7 @@ userSchema.methods.generateAccessToken = function () {
       _id: this._id,
       email: this.email,
       username: this.username,
-      fullName: this.fullName,
+      fullName: this.fullname,
     },
     process.env.ACCESS_TOKEN_SECRET,
     {
