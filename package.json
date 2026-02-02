@@ -1,17 +1,24 @@
 {
-  "name": "first-backend",
+  "name": "vyom-realm-backend",
   "version": "1.0.0",
-  "description": "my first backend project in chai aur backend series",
+  "description": "backend for vyom realm",
   "keywords": [
     "javascript",
-    "backend"
+    "backend",
+    "node",
+    "express",
+    "mongodb",
+    "mongoose",
+    "video-streaming",
+    "vyom-realm"
   ],
   "license": "ISC",
   "author": "Premansh Tripathi",
   "type": "module",
-  "main": "index.js",
+  "main": "src/index.js",
   "scripts": {
-    "test": "nodemon -r dotenv/config --experimental-json-modules src/test.js",
+    "start": "node src/index.js",
+    "test": "nodemon src/test.js",
     "dev": "nodemon src/index.js"
   },
   "devDependencies": {
