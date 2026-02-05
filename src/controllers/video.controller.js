@@ -21,29 +21,13 @@ const publishAVideo = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Title and Description must not be empty!");
   }
 
-  let videoLocalPath;
-
-  if (
-    req.files &&
-    Array.isArray(req.files.videoFile) &&
-    req.files.videoFile.length > 0
-  ) {
-    videoLocalPath = req.files?.videoFile[0].path;
-  }
+  const videoLocalPath = req.files?.videoFile?.[0]?.path;
 
   if (!videoLocalPath) {
     throw new ApiError(404, "Video file is required!");
   }
 
-  let thumbnailLocalPath;
-
-  if (
-    req.files &&
-    Array.isArray(req.files.thumbnail) &&
-    req.files.thumbnail.length > 0
-  ) {
-    thumbnailLocalPath = req.files?.thumbnail[0].path;
-  }
+  const thumbnailLocalPath = req.files?.thumbnail?.[0]?.path;
 
   if (!thumbnailLocalPath) {
     throw new ApiError(400, "Thumbnail file is required!");
@@ -56,6 +40,7 @@ const publishAVideo = asyncHandler(async (req, res) => {
   );
 
   if (!videoFile) {
+    if (thumbnailFile) await deleteFromCloudinary(thumbnailFile.public_id, "image");
     throw new ApiError(
       400,
       "Problem in uploading video file, please try again"
@@ -63,30 +48,37 @@ const publishAVideo = asyncHandler(async (req, res) => {
   }
 
   if (!thumbnailFile) {
+    if (videoFile) await deleteFromCloudinary(videoFile.public_id, "video");
     throw new ApiError(400, "Problem in uploading thumbnail, please try again");
   }
 
-  const video = await Video.create({
-    videoFileUrl: videoFile.url,
-    videoPublicId: videoFile.public_id,
-    thumbnailUrl: thumbnailFile.url,
-    thumbnailPublicId: thumbnailFile.public_id,
-    title,
-    description,
-    duration: videoFile.duration,
-    owner: req.user._id,
-  });
+  try {
+    const video = await Video.create({
+      videoFileUrl: videoFile.url,
+      videoPublicId: videoFile.public_id,
+      thumbnailUrl: thumbnailFile.url,
+      thumbnailPublicId: thumbnailFile.public_id,
+      title,
+      description,
+      duration: videoFile.duration,
+      owner: req.user._id,
+    });
 
-  if (!video) {
-    throw new ApiError(
-      500,
-      "Something went wrong while creating a video document in Mongo DB"
-    );
+    if (!video) {
+      throw new ApiError(
+        500,
+        "Something went wrong while creating a video document in Mongo DB"
+      );
+    }
+
+    return res
+      .status(201)
+      .json(new ApiResponse(201, video, "Video published successfully."));
+  } catch (error) {
+    if (videoFile) await deleteFromCloudinary(videoFile.public_id, "video");
+    if (thumbnailFile) await deleteFromCloudinary(thumbnailFile.public_id, "image");
+    throw new ApiError(500, "Something went wrong while publishing the video!");
   }
-
-  return res
-    .status(201)
-    .json(new ApiResponse(201, video, "Video published successfully."));
 });
 
 const getVideoById = asyncHandler(async (req, res) => {
@@ -132,7 +124,7 @@ const deleteVideo = asyncHandler(async (req, res) => {
 
     return res
       .status(200)
-      .json(new ApiResponse(200, {}, "Video deleed successfully."));
+      .json(new ApiResponse(200, {}, "Video deleted successfully."));
   } catch (error) {
     throw new ApiError(500, "Something went wrong while deleting the video!");
   }
