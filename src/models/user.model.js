@@ -28,8 +28,15 @@ const userSchema = new Schema(
       type: String, // cloudinary URL.
       required: [true, "Avatar is required!"],
     },
+    avatarPublicId: {
+      type: String,
+      required: true,
+    },
     coverImage: {
       type: String, // cloudinary URL.
+    },
+    coverImagePublicId: {
+      type: String,
     },
     watchHistory: [
       {
@@ -70,7 +77,7 @@ userSchema.methods.generateAccessToken = function () {
       _id: this._id,
       email: this.email,
       username: this.username,
-      fullName: this.fullname,
+      fullname: this.fullname,
     },
     process.env.ACCESS_TOKEN_SECRET,
     {
