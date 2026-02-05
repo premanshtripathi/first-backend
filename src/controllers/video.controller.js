@@ -4,7 +4,10 @@ import { User } from "../models/user.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import {
+  uploadOnCloudinary,
+  deleteFromCloudinary,
+} from "../utils/cloudinary.js";
 
 const getAllVideos = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query;
@@ -46,8 +49,11 @@ const publishAVideo = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Thumbnail file is required!");
   }
 
-  const videoFile = await uploadOnCloudinary(videoLocalPath);
-  const thumbnailFile = await uploadOnCloudinary(thumbnailLocalPath);
+  const videoFile = await uploadOnCloudinary(videoLocalPath, "videos");
+  const thumbnailFile = await uploadOnCloudinary(
+    thumbnailLocalPath,
+    "thumbnails"
+  );
 
   if (!videoFile) {
     throw new ApiError(
@@ -61,8 +67,10 @@ const publishAVideo = asyncHandler(async (req, res) => {
   }
 
   const video = await Video.create({
-    videoFile: videoFile.url,
-    thumbnail: thumbnailFile.url,
+    videoFileUrl: videoFile.url,
+    videoPublicId: videoFile.public_id,
+    thumbnailUrl: thumbnailFile.url,
+    thumbnailPublicId: thumbnailFile.public_id,
     title,
     description,
     duration: videoFile.duration,
@@ -106,7 +114,28 @@ const updateVideo = asyncHandler(async (req, res) => {
 
 const deleteVideo = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
-  //TODO: delete video
+  const video = await Video.findById(videoId);
+
+  if (!video) {
+    throw new ApiError(404, "Video does not exist!");
+  }
+
+  if (video.owner?.toString() !== req.user._id.toString()) {
+    throw new ApiError(403, "You are not authorized to delete this video!");
+  }
+
+  try {
+    await deleteFromCloudinary(video.videoPublicId, "video");
+    await deleteFromCloudinary(video.thumbnailPublicId, "image");
+
+    await Video.deleteOne({ _id: video._id });
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, {}, "Video deleed successfully."));
+  } catch (error) {
+    throw new ApiError(500, "Something went wrong while deleting the video!");
+  }
 });
 
 const togglePublishStatus = asyncHandler(async (req, res) => {
