@@ -43,14 +43,14 @@ const publishAVideo = asyncHandler(async (req, res) => {
     if (thumbnailFile)
       await deleteFromCloudinary(thumbnailFile.public_id, "image");
     throw new ApiError(
-      400,
+      500,
       "Problem in uploading video file, please try again"
     );
   }
 
   if (!thumbnailFile) {
     if (videoFile) await deleteFromCloudinary(videoFile.public_id, "video");
-    throw new ApiError(400, "Problem in uploading thumbnail, please try again");
+    throw new ApiError(500, "Problem in uploading thumbnail, please try again");
   }
 
   try {
@@ -104,6 +104,67 @@ const getVideoById = asyncHandler(async (req, res) => {
 const updateVideo = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
   //TODO: update video details like title, description, thumbnail
+  const title = req.body.title || null;
+  const description = req.body?.description || null;
+  const thumbnailLocalPath = req.file?.path || null;
+  if (!title && !description && !thumbnailLocalPath) {
+    throw new ApiError(400, "Nothing to update!");
+  }
+
+  const video = await Video.findById(videoId);
+
+  if (!video) {
+    throw new ApiError(404, "Video does not exist!");
+  }
+
+  if (video.owner?.toString() !== req.user?._id?.toString()) {
+    throw new ApiError(
+      403,
+      "You are not authorized to update the details of this video!"
+    );
+  }
+  let thumbnailFile = null;
+  let oldPublicId = null;
+  if (title) video.title = title;
+  if (description) video.description = description;
+  if (thumbnailLocalPath) {
+    thumbnailFile = await uploadOnCloudinary(thumbnailLocalPath, "thumbnails");
+
+    if (!thumbnailFile) {
+      throw new ApiError(
+        500,
+        "Problem in uploading thumbnail, please try again"
+      );
+    }
+
+    oldPublicId = video.thumbnailPublicId;
+    video.thumbnailUrl = thumbnailFile.url;
+    video.thumbnailPublicId = thumbnailFile.public_id;
+  }
+  try {
+    const updatedVideo = await video.save({ validateBeforeSave: false });
+
+    if (!updatedVideo) {
+      throw new ApiError(
+        500,
+        "Something went wrong while saving details into Database!"
+      );
+    }
+    if (thumbnailLocalPath && oldPublicId)
+      await deleteFromCloudinary(oldPublicId);
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          updatedVideo,
+          `Video details updated successfully.`
+        )
+      );
+  } catch (error) {
+    if (thumbnailFile) await deleteFromCloudinary(thumbnailFile.public_id);
+    throw new ApiError(500, "Something went wrong while updating the details.");
+  }
 });
 
 const deleteVideo = asyncHandler(async (req, res) => {
