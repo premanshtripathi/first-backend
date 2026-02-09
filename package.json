@@ -19,7 +19,8 @@
   "scripts": {
     "start": "node src/index.js",
     "test": "nodemon src/test.js",
-    "dev": "nodemon src/index.js"
+    "dev": "nodemon src/index.js",
+    "seed": "node src/seed.js"
   },
   "devDependencies": {
     "@faker-js/faker": "^10.3.0",
