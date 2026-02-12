@@ -6,7 +6,6 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
 const createTweet = asyncHandler(async (req, res) => {
-  //TODO: create tweet
   const content = req.body?.content?.trim();
   const owner = req.user?._id;
   if (!content) {
@@ -35,7 +34,50 @@ const getUserTweets = asyncHandler(async (req, res) => {
 });
 
 const updateTweet = asyncHandler(async (req, res) => {
-  //TODO: update tweet
+  const tweetId = req.params?.tweetId;
+  const content = req.body?.content?.trim();
+
+  if (!isValidObjectId(tweetId)) {
+    throw new ApiError(400, "Invalid tweet id!");
+  }
+
+  if (!content) {
+    throw new ApiError(400, "Tweet content must not be empty!");
+  }
+
+  const tweet = await Tweet.findById(tweetId);
+
+  if (!tweet) {
+    throw new ApiError(404, "Tweet does not exist!");
+  }
+
+  if (
+    !tweet.owner ||
+    !req.user?._id ||
+    req.user?._id.toString() !== tweet.owner.toString()
+  ) {
+    throw new ApiError(401, "You are not authorized to update this tweet!");
+  }
+
+  tweet.content = content;
+  const updatedTweet = await tweet.save();
+
+  if (!updatedTweet) {
+    throw new ApiError(
+      500,
+      "Something went wrong while updating the tweet in the database!"
+    );
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        updatedTweet,
+        "The tweet has been updated successfully."
+      )
+    );
 });
 
 const deleteTweet = asyncHandler(async (req, res) => {
