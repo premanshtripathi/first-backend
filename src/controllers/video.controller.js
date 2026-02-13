@@ -191,10 +191,38 @@ const getVideoById = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Invalid Video ID!");
   }
 
-  const video = await Video.findById(videoId);
+  const [video] = await Video.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(videoId),
+      },
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "ownerDetails",
+        pipeline: [{ $project: { username: 1, fullname: 1, avatar: 1 } }],
+      },
+    },
+    {
+      $unwind: { path: "$ownerDetails", preserveNullAndEmptyArrays: true },
+    },
+  ]);
 
   if (!video) {
     throw new ApiError(404, "Video does not exist!");
+  }
+
+  if (
+    !video.isPublished &&
+    (!req.user || req.user?._id.toString() !== video.owner.toString())
+  ) {
+    throw new ApiError(
+      401,
+      "You are not authorized to view this private video!"
+    );
   }
 
   return res
@@ -217,7 +245,11 @@ const updateVideo = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Video does not exist!");
   }
 
-  if (video.owner?.toString() !== req.user?._id?.toString()) {
+  if (
+    !video.owner ||
+    !req.user?._id ||
+    video.owner?.toString() !== req.user?._id?.toString()
+  ) {
     throw new ApiError(
       403,
       "You are not authorized to update the details of this video!"
@@ -242,7 +274,7 @@ const updateVideo = asyncHandler(async (req, res) => {
     video.thumbnailPublicId = thumbnailFile.public_id;
   }
   try {
-    const updatedVideo = await video.save({ validateBeforeSave: false });
+    const updatedVideo = await video.save();
 
     if (!updatedVideo) {
       throw new ApiError(
@@ -275,22 +307,26 @@ const deleteVideo = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Video does not exist!");
   }
 
-  if (video.owner?.toString() !== req.user?._id?.toString()) {
-    throw new ApiError(403, "You are not authorized to delete this video!");
+  if (
+    !video.owner ||
+    !req.user?._id ||
+    video.owner?.toString() !== req.user?._id?.toString()
+  ) {
+    throw new ApiError(401, "You are not authorized to delete this video!");
   }
 
-  try {
-    await deleteFromCloudinary(video.videoPublicId, "video");
-    await deleteFromCloudinary(video.thumbnailPublicId, "image");
+  await deleteFromCloudinary(video.videoPublicId, "video");
+  await deleteFromCloudinary(video.thumbnailPublicId, "image");
 
-    await Video.deleteOne({ _id: video._id });
+  const result = await Video.deleteOne({ _id: video._id });
 
-    return res
-      .status(200)
-      .json(new ApiResponse(200, {}, "Video deleted successfully."));
-  } catch (error) {
-    throw new ApiError(500, "Something went wrong while deleting the video!");
+  if (result.deletedCount <= 0) {
+    throw new ApiError(500, "No video was deleted!");
   }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Video deleted successfully."));
 });
 
 const togglePublishStatus = asyncHandler(async (req, res) => {
